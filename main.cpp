@@ -1,34 +1,31 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <set>
 #include <string>
-#include <algorithm>
-
 using namespace std;
 
+int kmap[4][4];
 
-// ============================================================
-// GRAY CODE
-// Columns -> AB
-// Rows    -> CD
-// ============================================================
-
-string gray[4] = {"00", "01", "11", "10"};
-
-
-// ============================================================
-// READ K-MAP FROM FILE
-// ============================================================
-
-bool readKMap(string filename, int kmap[4][4])
+int gray[4][2] =
 {
-    ifstream file(filename);
+    {0,0},
+    {0,1},
+    {1,1},
+    {1,0}
+};
+
+// ------------------------------------------------------------
+// Read the K-map from input.txt
+// ------------------------------------------------------------
+
+void readKMap()
+{
+    ifstream file("input.txt");
 
     if (!file)
     {
-        cout << "Cannot open input.txt\n";
-        return false;
+        cout << "File not found!" << endl;
+        return;
     }
 
     for (int i = 0; i < 4; i++)
@@ -36,693 +33,586 @@ bool readKMap(string filename, int kmap[4][4])
         for (int j = 0; j < 4; j++)
         {
             file >> kmap[i][j];
-
-            // Only 0 and 1 are allowed
-            if (kmap[i][j] != 0 && kmap[i][j] != 1)
-            {
-                cout << "Invalid input. Only 0 and 1 are allowed.\n";
-                return false;
-            }
         }
     }
 
-    return true;
+    file.close();
 }
 
+// ------------------------------------------------------------
+// Check whether a group is valid
+// ------------------------------------------------------------
 
-// ============================================================
-// GET A B C D VALUES OF A CELL
-// ============================================================
-
-vector<int> getABCD(int row, int col)
+bool validGroup(vector<pair<int,int> > group)
 {
-    vector<int> value(4);
-
-    // Column gives AB
-    value[0] = gray[col][0] - '0';   // A
-    value[1] = gray[col][1] - '0';   // B
-
-    // Row gives CD
-    value[2] = gray[row][0] - '0';   // C
-    value[3] = gray[row][1] - '0';   // D
-
-    return value;
-}
-
-
-// ============================================================
-// CHECK WHETHER A GROUP CONTAINS ONLY 1s
-// ============================================================
-
-bool isValidGroup(
-    int kmap[4][4],
-    vector<pair<int, int>> cells)
-{
-    for (auto cell : cells)
+    for (int i = 0; i < group.size(); i++)
     {
-        int row = cell.first;
-        int col = cell.second;
+        int r = group[i].first;
+        int c = group[i].second;
 
-        if (kmap[row][col] == 0)
+        if (kmap[r][c] != 1)
             return false;
     }
 
     return true;
 }
 
+// ------------------------------------------------------------
+// Check whether this group is already present
+// ------------------------------------------------------------
 
-// ============================================================
-// CHECK WHETHER TWO GROUPS ARE SAME
-// ============================================================
-
-bool sameGroup(
-    vector<pair<int, int>> group1,
-    vector<pair<int, int>> group2)
+bool sameGroup(vector<pair<int,int> > a,
+               vector<pair<int,int> > b)
 {
-    set<pair<int, int>> a(
-        group1.begin(),
-        group1.end()
-    );
+    if (a.size() != b.size())
+        return false;
 
-    set<pair<int, int>> b(
-        group2.begin(),
-        group2.end()
-    );
-
-    return a == b;
-}
-
-
-// ============================================================
-// ADD GROUP WITHOUT DUPLICATES
-// ============================================================
-
-void addGroup(
-    vector<vector<pair<int, int>>> &groups,
-    vector<pair<int, int>> newGroup)
-{
-    for (auto group : groups)
+    for (int i = 0; i < a.size(); i++)
     {
-        if (sameGroup(group, newGroup))
-            return;
-    }
+        bool found = false;
 
-    groups.push_back(newGroup);
-}
-
-
-// ============================================================
-// CREATE BOOLEAN TERM FROM A GROUP
-// ============================================================
-
-string makeTerm(vector<pair<int, int>> cells)
-{
-    vector<vector<int>> values;
-
-    // Get ABCD values of every cell
-    for (auto cell : cells)
-    {
-        values.push_back(
-            getABCD(cell.first, cell.second)
-        );
-    }
-
-    string variableName = "abcd";
-
-    string term = "";
-
-    // Compare A, B, C and D
-    for (int variable = 0; variable < 4; variable++)
-    {
-        bool same = true;
-
-        for (int i = 1; i < values.size(); i++)
+        for (int j = 0; j < b.size(); j++)
         {
-            if (values[i][variable] !=
-                values[0][variable])
+            if (a[i].first == b[j].first &&
+                a[i].second == b[j].second)
             {
-                same = false;
+                found = true;
                 break;
             }
         }
 
-        // If the variable is same in every cell
-        if (same)
+        if (!found)
+            return false;
+    }
+
+    return true;
+}
+
+// ------------------------------------------------------------
+// Add group if it is not already there
+// ------------------------------------------------------------
+
+void addGroup(vector<vector<pair<int,int> > > &groups,
+              vector<pair<int,int> > group)
+{
+    if (!validGroup(group))
+        return;
+
+    for (int i = 0; i < groups.size(); i++)
+    {
+        if (sameGroup(groups[i], group))
+            return;
+    }
+
+    groups.push_back(group);
+}
+
+// ------------------------------------------------------------
+// Generate all possible K-map groups
+// ------------------------------------------------------------
+
+void generateGroups(vector<vector<pair<int,int> > > &groups)
+{
+    // --------------------------------------------------------
+    // 16 cells
+    // --------------------------------------------------------
+
+    vector<pair<int,int> > group;
+
+    for (int r = 0; r < 4; r++)
+    {
+        for (int c = 0; c < 4; c++)
         {
-            if (values[0][variable] == 1)
+            group.push_back({r,c});
+        }
+    }
+
+    addGroup(groups, group);
+
+    // --------------------------------------------------------
+    // Groups of 8 cells
+    // --------------------------------------------------------
+
+    // 2 rows x 4 columns
+    for (int r = 0; r < 4; r += 2)
+    {
+        group.clear();
+
+        for (int i = 0; i < 2; i++)
+        {
+            for (int c = 0; c < 4; c++)
             {
-                term += variableName[variable];
+                group.push_back({(r+i)%4,c});
             }
-            else
+        }
+
+        addGroup(groups, group);
+    }
+
+    // 4 rows x 2 columns
+    for (int c = 0; c < 4; c += 2)
+    {
+        group.clear();
+
+        for (int r = 0; r < 4; r++)
+        {
+            for (int j = 0; j < 2; j++)
             {
-                term += variableName[variable];
+                group.push_back({r,(c+j)%4});
+            }
+        }
+
+        addGroup(groups, group);
+    }
+
+    // --------------------------------------------------------
+    // Groups of 4 cells
+    // --------------------------------------------------------
+
+    // 1 row x 4 columns
+    for (int r = 0; r < 4; r++)
+    {
+        group.clear();
+
+        for (int c = 0; c < 4; c++)
+        {
+            group.push_back({r,c});
+        }
+
+        addGroup(groups, group);
+    }
+
+    // 4 rows x 1 column
+    for (int c = 0; c < 4; c++)
+    {
+        group.clear();
+
+        for (int r = 0; r < 4; r++)
+        {
+            group.push_back({r,c});
+        }
+
+        addGroup(groups, group);
+    }
+
+    // 2 rows x 2 columns
+    for (int r = 0; r < 4; r++)
+    {
+        group.clear();
+
+        for (int i = 0; i < 2; i++)
+        {
+            for (int j = 0; j < 2; j++)
+            {
+                group.push_back({
+                    (r+i)%4,
+                    j
+                });
+            }
+        }
+
+        addGroup(groups, group);
+
+        group.clear();
+
+        for (int i = 0; i < 2; i++)
+        {
+            for (int j = 0; j < 2; j++)
+            {
+                group.push_back({
+                    (r+i)%4,
+                    (j+2)%4
+                });
+            }
+        }
+
+        addGroup(groups, group);
+    }
+
+    // --------------------------------------------------------
+    // Groups of 2 cells
+    // --------------------------------------------------------
+
+    // Horizontal pairs
+    for (int r = 0; r < 4; r++)
+    {
+        for (int c = 0; c < 4; c++)
+        {
+            group.clear();
+
+            group.push_back({r,c});
+            group.push_back({r,(c+1)%4});
+
+            addGroup(groups, group);
+        }
+    }
+
+    // Vertical pairs
+    for (int r = 0; r < 4; r++)
+    {
+        for (int c = 0; c < 4; c++)
+        {
+            group.clear();
+
+            group.push_back({r,c});
+            group.push_back({(r+1)%4,c});
+
+            addGroup(groups, group);
+        }
+    }
+
+    // --------------------------------------------------------
+    // Groups of 1 cell
+    // --------------------------------------------------------
+
+    for (int r = 0; r < 4; r++)
+    {
+        for (int c = 0; c < 4; c++)
+        {
+            group.clear();
+
+            group.push_back({r,c});
+
+            addGroup(groups, group);
+        }
+    }
+}
+
+// ------------------------------------------------------------
+// Get A B C D values of a cell
+// Columns = AB
+// Rows = CD
+// ------------------------------------------------------------
+
+void getABCD(int row, int col, int value[])
+{
+    value[0] = gray[col][0];   // A
+    value[1] = gray[col][1];   // B
+    value[2] = gray[row][0];   // C
+    value[3] = gray[row][1];   // D
+}
+
+// ------------------------------------------------------------
+// Convert a group into a Boolean term
+// ------------------------------------------------------------
+
+string makeTerm(vector<pair<int,int> > group)
+{
+    int first[4];
+
+    getABCD(group[0].first,
+            group[0].second,
+            first);
+
+    bool same[4];
+
+    for (int i = 0; i < 4; i++)
+        same[i] = true;
+
+    for (int i = 1; i < group.size(); i++)
+    {
+        int current[4];
+
+        getABCD(group[i].first,
+                group[i].second,
+                current);
+
+        for (int j = 0; j < 4; j++)
+        {
+            if (first[j] != current[j])
+                same[j] = false;
+        }
+    }
+
+    string term = "";
+
+    char variables[4] = {'a','b','c','d'};
+
+    for (int i = 0; i < 4; i++)
+    {
+        if (same[i])
+        {
+            term += variables[i];
+
+            if (first[i] == 0)
                 term += "'";
-            }
         }
     }
 
     return term;
 }
 
+// ------------------------------------------------------------
+// Number of literals in a group
+//
+// 1 cell  -> 4 literals
+// 2 cells -> 3 literals
+// 4 cells -> 2 literals
+// 8 cells -> 1 literal
+// 16 cells -> 0 literals
+// ------------------------------------------------------------
 
-// ============================================================
-// GENERATE ALL POSSIBLE GROUPS
-// ============================================================
-
-vector<vector<pair<int, int>>> generateGroups(
-    int kmap[4][4])
+int literals(vector<pair<int,int> > group)
 {
-    vector<vector<pair<int, int>>> groups;
+    if (group.size() == 1)
+        return 4;
 
+    if (group.size() == 2)
+        return 3;
 
-    // ========================================================
-    // GROUP OF 16
-    // ========================================================
+    if (group.size() == 4)
+        return 2;
 
-    {
-        vector<pair<int, int>> cells;
+    if (group.size() == 8)
+        return 1;
 
-        for (int r = 0; r < 4; r++)
-        {
-            for (int c = 0; c < 4; c++)
-            {
-                cells.push_back({r, c});
-            }
-        }
-
-        if (isValidGroup(kmap, cells))
-            addGroup(groups, cells);
-    }
-
-
-    // ========================================================
-    // GROUPS OF 8
-    // ========================================================
-
-    // 2 x 4
-    for (int r = 0; r < 4; r++)
-    {
-        vector<pair<int, int>> cells;
-
-        int r1 = r;
-        int r2 = (r + 1) % 4;
-
-        for (int c = 0; c < 4; c++)
-        {
-            cells.push_back({r1, c});
-            cells.push_back({r2, c});
-        }
-
-        if (isValidGroup(kmap, cells))
-            addGroup(groups, cells);
-    }
-
-
-    // 4 x 2
-    for (int c = 0; c < 4; c++)
-    {
-        vector<pair<int, int>> cells;
-
-        int c1 = c;
-        int c2 = (c + 1) % 4;
-
-        for (int r = 0; r < 4; r++)
-        {
-            cells.push_back({r, c1});
-            cells.push_back({r, c2});
-        }
-
-        if (isValidGroup(kmap, cells))
-            addGroup(groups, cells);
-    }
-
-
-    // ========================================================
-    // GROUPS OF 4
-    // ========================================================
-
-    // 1 x 4
-    for (int r = 0; r < 4; r++)
-    {
-        vector<pair<int, int>> cells;
-
-        for (int c = 0; c < 4; c++)
-        {
-            cells.push_back({r, c});
-        }
-
-        if (isValidGroup(kmap, cells))
-            addGroup(groups, cells);
-    }
-
-
-    // 4 x 1
-    for (int c = 0; c < 4; c++)
-    {
-        vector<pair<int, int>> cells;
-
-        for (int r = 0; r < 4; r++)
-        {
-            cells.push_back({r, c});
-        }
-
-        if (isValidGroup(kmap, cells))
-            addGroup(groups, cells);
-    }
-
-
-    // 2 x 2
-    for (int r = 0; r < 4; r++)
-    {
-        for (int c = 0; c < 4; c++)
-        {
-            vector<pair<int, int>> cells;
-
-            int r1 = r;
-            int r2 = (r + 1) % 4;
-
-            int c1 = c;
-            int c2 = (c + 1) % 4;
-
-            cells.push_back({r1, c1});
-            cells.push_back({r1, c2});
-            cells.push_back({r2, c1});
-            cells.push_back({r2, c2});
-
-            if (isValidGroup(kmap, cells))
-                addGroup(groups, cells);
-        }
-    }
-
-
-    // ========================================================
-    // GROUPS OF 2
-    // ========================================================
-
-    // Horizontal pair
-    for (int r = 0; r < 4; r++)
-    {
-        for (int c = 0; c < 4; c++)
-        {
-            vector<pair<int, int>> cells;
-
-            cells.push_back({r, c});
-            cells.push_back({r, (c + 1) % 4});
-
-            if (isValidGroup(kmap, cells))
-                addGroup(groups, cells);
-        }
-    }
-
-
-    // Vertical pair
-    for (int r = 0; r < 4; r++)
-    {
-        for (int c = 0; c < 4; c++)
-        {
-            vector<pair<int, int>> cells;
-
-            cells.push_back({r, c});
-            cells.push_back({(r + 1) % 4, c});
-
-            if (isValidGroup(kmap, cells))
-                addGroup(groups, cells);
-        }
-    }
-
-
-    // ========================================================
-    // SINGLE CELLS
-    // ========================================================
-
-    for (int r = 0; r < 4; r++)
-    {
-        for (int c = 0; c < 4; c++)
-        {
-            if (kmap[r][c] == 1)
-            {
-                vector<pair<int, int>> cells;
-
-                cells.push_back({r, c});
-
-                addGroup(groups, cells);
-            }
-        }
-    }
-
-
-    return groups;
+    return 0;
 }
 
+// ------------------------------------------------------------
+// Check whether all 1s are covered
+// ------------------------------------------------------------
 
-// ============================================================
-// CHECK IF ONE GROUP IS INSIDE ANOTHER GROUP
-// ============================================================
-
-bool isSubset(
-    vector<pair<int, int>> small,
-    vector<pair<int, int>> large)
+bool allCovered(vector<pair<int,int> > ones,
+                vector<vector<pair<int,int> > > selected)
 {
-    set<pair<int, int>> A(
-        small.begin(),
-        small.end()
-    );
-
-    set<pair<int, int>> B(
-        large.begin(),
-        large.end()
-    );
-
-    for (auto cell : A)
+    for (int i = 0; i < ones.size(); i++)
     {
-        if (B.find(cell) == B.end())
+        bool covered = false;
+
+        for (int j = 0; j < selected.size(); j++)
+        {
+            for (int k = 0; k < selected[j].size(); k++)
+            {
+                if (ones[i].first == selected[j][k].first &&
+                    ones[i].second == selected[j][k].second)
+                {
+                    covered = true;
+                    break;
+                }
+            }
+
+            if (covered)
+                break;
+        }
+
+        if (!covered)
             return false;
     }
 
     return true;
 }
 
+// ------------------------------------------------------------
+// Check whether a group covers a particular cell
+// ------------------------------------------------------------
 
-// ============================================================
-// KEEP ONLY LARGEST POSSIBLE GROUPS
-// ============================================================
-
-vector<vector<pair<int, int>>> getUsefulGroups(
-    vector<vector<pair<int, int>>> groups)
+bool contains(vector<pair<int,int> > group,
+              pair<int,int> cell)
 {
-    vector<vector<pair<int, int>>> usefulGroups;
-
-    for (int i = 0; i < groups.size(); i++)
+    for (int i = 0; i < group.size(); i++)
     {
-        bool smallerGroup = false;
-
-        for (int j = 0; j < groups.size(); j++)
+        if (group[i].first == cell.first &&
+            group[i].second == cell.second)
         {
-            if (i == j)
-                continue;
+            return true;
+        }
+    }
 
-            // If another group is larger
-            // and contains this group
-            if (groups[j].size() > groups[i].size())
+    return false;
+}
+
+// ------------------------------------------------------------
+// Make expression from selected groups
+// ------------------------------------------------------------
+
+string makeExpression(vector<vector<pair<int,int> > > selected)
+{
+    string expression = "";
+
+    for (int i = 0; i < selected.size(); i++)
+    {
+        string term = makeTerm(selected[i]);
+
+        if (term == "")
+            term = "1";
+
+        if (i != 0)
+            expression += " + ";
+
+        expression += term;
+    }
+
+    return expression;
+}
+
+// ------------------------------------------------------------
+// Find all minimum solutions
+// ------------------------------------------------------------
+
+void findSolutions(
+    vector<vector<pair<int,int> > > &groups,
+    vector<pair<int,int> > &ones,
+    vector<vector<pair<int,int> > > selected,
+    int start,
+    int currentCost,
+    int &bestCost,
+    vector<string> &answers)
+{
+    // If everything is covered
+    if (allCovered(ones, selected))
+    {
+        string expression = makeExpression(selected);
+
+        if (currentCost < bestCost)
+        {
+            bestCost = currentCost;
+
+            answers.clear();
+            answers.push_back(expression);
+        }
+        else if (currentCost == bestCost)
+        {
+            bool already = false;
+
+            for (int i = 0; i < answers.size(); i++)
             {
-                if (isSubset(groups[i], groups[j]))
+                if (answers[i] == expression)
                 {
-                    smallerGroup = true;
+                    already = true;
+                    break;
+                }
+            }
+
+            if (!already)
+                answers.push_back(expression);
+        }
+
+        return;
+    }
+
+    // If already worse than best solution
+    if (currentCost >= bestCost)
+        return;
+
+    // Try every possible group
+    for (int i = start; i < groups.size(); i++)
+    {
+        int cost = literals(groups[i]);
+
+        // If this group gives no benefit, skip
+        bool useful = false;
+
+        for (int j = 0; j < ones.size(); j++)
+        {
+            if (contains(groups[i], ones[j]))
+            {
+                bool alreadyCovered = false;
+
+                for (int k = 0; k < selected.size(); k++)
+                {
+                    if (contains(selected[k], ones[j]))
+                    {
+                        alreadyCovered = true;
+                        break;
+                    }
+                }
+
+                if (!alreadyCovered)
+                {
+                    useful = true;
                     break;
                 }
             }
         }
 
-        if (!smallerGroup)
-        {
-            usefulGroups.push_back(groups[i]);
-        }
-    }
+        if (!useful)
+            continue;
 
-    return usefulGroups;
+        selected.push_back(groups[i]);
+
+        findSolutions(
+            groups,
+            ones,
+            selected,
+            i + 1,
+            currentCost + cost,
+            bestCost,
+            answers
+        );
+
+        selected.pop_back();
+    }
 }
 
+// ------------------------------------------------------------
+// Get all cells containing 1
+// ------------------------------------------------------------
 
-// ============================================================
-// GET ALL CELLS WHICH CONTAIN 1
-// ============================================================
-
-set<pair<int, int>> getAllOnes(int kmap[4][4])
+void getOnes(vector<pair<int,int> > &ones)
 {
-    set<pair<int, int>> ones;
-
     for (int r = 0; r < 4; r++)
     {
         for (int c = 0; c < 4; c++)
         {
             if (kmap[r][c] == 1)
             {
-                ones.insert({r, c});
+                ones.push_back({r,c});
             }
         }
     }
-
-    return ones;
 }
 
-
-// ============================================================
-// FIND ALL POSSIBLE COVERS
-// ============================================================
-
-void findCovers(
-    vector<vector<pair<int, int>>> &groups,
-    int index,
-    set<pair<int, int>> covered,
-    set<pair<int, int>> target,
-    vector<int> selected,
-    vector<vector<int>> &solutions)
-{
-    // All 1s are covered
-    if (covered == target)
-    {
-        solutions.push_back(selected);
-        return;
-    }
-
-    if (index >= groups.size())
-        return;
-
-
-    // --------------------------------------------------------
-    // TAKE CURRENT GROUP
-    // --------------------------------------------------------
-
-    set<pair<int, int>> newCovered = covered;
-
-    for (auto cell : groups[index])
-    {
-        newCovered.insert(cell);
-    }
-
-    selected.push_back(index);
-
-    findCovers(
-        groups,
-        index + 1,
-        newCovered,
-        target,
-        selected,
-        solutions
-    );
-
-    selected.pop_back();
-
-
-    // --------------------------------------------------------
-    // DON'T TAKE CURRENT GROUP
-    // --------------------------------------------------------
-
-    findCovers(
-        groups,
-        index + 1,
-        covered,
-        target,
-        selected,
-        solutions
-    );
-}
-
-
-// ============================================================
-// MAIN
-// ============================================================
+// ------------------------------------------------------------
+// Main
+// ------------------------------------------------------------
 
 int main()
 {
-    int kmap[4][4];
+    readKMap();
 
+    vector<pair<int,int> > ones;
 
-    // --------------------------------------------------------
-    // READ INPUT FILE
-    // --------------------------------------------------------
+    getOnes(ones);
 
-    string filename = "input.txt";
-
-    if (!readKMap(filename, kmap))
+    if (ones.size() == 0)
     {
+        cout << "F = 0" << endl;
         return 0;
     }
 
+    vector<vector<pair<int,int> > > groups;
 
-    // --------------------------------------------------------
-    // DISPLAY K-MAP
-    // --------------------------------------------------------
+    generateGroups(groups);
 
-    cout << "K-Map:\n\n";
+    vector<vector<pair<int,int> > > selected;
 
-    for (int r = 0; r < 4; r++)
-    {
-        for (int c = 0; c < 4; c++)
-        {
-            cout << kmap[r][c] << " ";
-        }
+    vector<string> answers;
 
-        cout << endl;
-    }
+    int bestCost = 1000;
 
-
-    // --------------------------------------------------------
-    // DISPLAY VARIABLE ORDER
-    // --------------------------------------------------------
-
-    cout << "\nColumn order (AB): ";
-    cout << "00 01 11 10\n";
-
-    cout << "Row order (CD):    ";
-    cout << "00 01 11 10\n";
-
-
-    // --------------------------------------------------------
-    // GENERATE GROUPS
-    // --------------------------------------------------------
-
-    vector<vector<pair<int, int>>> groups =
-        generateGroups(kmap);
-
-
-    // Keep largest useful groups
-    groups = getUsefulGroups(groups);
-
-
-    // --------------------------------------------------------
-    // GET ALL 1s
-    // --------------------------------------------------------
-
-    set<pair<int, int>> ones =
-        getAllOnes(kmap);
-
-
-    // If there are no 1s
-    if (ones.empty())
-    {
-        cout << "\nBoolean Expression: 0\n";
-        return 0;
-    }
-
-
-    // --------------------------------------------------------
-    // FIND ALL COVERS
-    // --------------------------------------------------------
-
-    vector<vector<int>> solutions;
-
-    findCovers(
+    findSolutions(
         groups,
-        0,
-        {},
         ones,
-        {},
-        solutions
+        selected,
+        0,
+        0,
+        bestCost,
+        answers
     );
 
+    cout << endl;
+    cout << "All possible minimum Boolean expressions:" << endl;
+    cout << endl;
 
-    if (solutions.empty())
+    for (int i = 0; i < answers.size(); i++)
     {
-        cout << "\nNo solution found.\n";
-        return 0;
+        cout << "F = " << answers[i] << endl;
     }
 
-
-    // --------------------------------------------------------
-    // FIND MINIMUM NUMBER OF GROUPS
-    // --------------------------------------------------------
-
-    int minimumGroups =
-        solutions[0].size();
-
-    for (auto solution : solutions)
-    {
-        if (solution.size() < minimumGroups)
-        {
-            minimumGroups =
-                solution.size();
-        }
-    }
-
-
-    // --------------------------------------------------------
-    // CREATE EXPRESSIONS
-    // --------------------------------------------------------
-
-    set<string> finalExpressions;
-
-
-    for (auto solution : solutions)
-    {
-        // Only minimum-group solutions
-        if (solution.size() != minimumGroups)
-            continue;
-
-
-        vector<string> terms;
-
-
-        for (int groupIndex : solution)
-        {
-            string term =
-                makeTerm(groups[groupIndex]);
-
-
-            // Avoid duplicate terms
-            if (find(
-                    terms.begin(),
-                    terms.end(),
-                    term
-                ) == terms.end())
-            {
-                terms.push_back(term);
-            }
-        }
-
-
-        // Sort terms
-        sort(
-            terms.begin(),
-            terms.end()
-        );
-
-
-        // Join using +
-        string expression = "";
-
-        for (int i = 0; i < terms.size(); i++)
-        {
-            if (i > 0)
-            {
-                expression += " + ";
-            }
-
-            expression += terms[i];
-        }
-
-
-        finalExpressions.insert(expression);
-    }
-
-
-    // --------------------------------------------------------
-    // PRINT RESULT
-    // --------------------------------------------------------
-
-    cout << "\nAll possible minimized Boolean expressions:\n\n";
-
-
-    int count = 1;
-
-    for (string expression : finalExpressions)
-    {
-        cout << count << ". "
-             << expression << endl;
-
-        count++;
-    }
-
+    cout << endl;
+    cout << "Minimum number of literals = "
+         << bestCost << endl;
 
     return 0;
 }
